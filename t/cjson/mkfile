@@ -1,0 +1,17 @@
+OPT_ROOT=$INFERNO_HOME
+<$ROOT/mkconfig
+
+TARG=\
+
+TESTS=\
+	smoke.dis\
+
+SYSMODULES=\
+	sys.m\
+	draw.m\
+
+MODULES=\
+	../../module/cjson.m\
+
+<$OPT_ROOT/opt/powerman/tap/mktest
+LIMBOFLAGS=$LIMBOFLAGS -I$OPT_ROOT

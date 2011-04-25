@@ -1,0 +1,10 @@
+syntax: glob
+
+# debug
+*.sbl
+
+
+syntax: regexp
+
+# temp
+tmp/.*

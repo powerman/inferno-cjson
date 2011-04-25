@@ -1,0 +1,255 @@
+.TH CJSON 2
+.SH NAME
+cjson \- fast JSON tokenizer
+.SH SYNOPSIS
+.EX
+include "cjson.m";
+        cjson: CJSON;
+        Token: import cjson;
+        END_OBJ, UNK_KEY: import cjson;
+cjson = load CJSON CJSON->PATH;
+
+makekeys: fn(a: array of string): Keys;
+
+Token: adt{
+        new:            fn(a: array of byte): ref Token;
+        openobj:        fn(t: self ref Token);
+        closeobj:       fn(t: self ref Token);
+        openarr:        fn(t: self ref Token);
+        closearr:       fn(t: self ref Token): int;
+        getkey:         fn(t: self ref Token, k: Keys): int;
+        getnull:        fn(t: self ref Token): int;
+        getbool:        fn(t: self ref Token): int;
+        gets:           fn(t: self ref Token): string;
+        getr:           fn(t: self ref Token): real;
+        getn:           fn(t: self ref Token): int;
+        skip:           fn(t: self ref Token);
+        gettype:        fn(t: self ref Token): int;
+        end:            fn(t: self ref Token);
+};
+
+.EE
+.SH DESCRIPTION
+.PP
+This module provide faster (in about 5 times) and ease to use alternative
+to 
+.IR json (2).
+.PP
+Writing JSON doesn't supported yet, it will be implemented later.
+.PP
+To parse as fast as possible it doesn't validate input strictly, and so
+may accept incorrectly formed JSON. Also it unable to return unknown
+object key names - all possible object key names must be precompiled using
+.B makekeys
+and provided to 
+.B getkey
+while parsing.
+.PP
+.B makekeys
+return compiled form of known object keys. You may compile keys
+separately for each type of object, or compile all possible keys in all
+possible objects at once. You'll need returned value to call 
+.BR getkey .
+Usually 
+.B makekeys
+called only when your application initializes.
+Will raise exception on empty or duplicate keys in 
+.IR a .
+.PP
+.B new
+create and return new 
+.BR Token ,
+which then should be used to parse
+JSON from 
+.I a
+(which should contain any amount of complete JSON values).
+.PP
+.B openobj
+ensure next token is 
+.SM {
+and skip it. Maximum depth of opened
+objects/arrays currently limited to 16.
+Will raise exception if next token isn't 
+.SM { .
+.PP
+.B closeobj
+ensure next token is 
+.SM }
+and skip it.
+Will raise exception if next token isn't 
+.SM } .
+.PP
+.B openarr
+ensure next token is 
+.SM [
+and skip it. Maximum depth of opened
+objects/arrays currently limited to 16.
+Will raise exception if next token isn't 
+.SM [ .
+.PP
+.B closearr
+check is next token is 
+.SM ]
+, if yes then skip it and return 1,
+else do nothing and return 0. User expected to call 
+.B closearr
+when unsure
+how many elements left in array and check returned value.
+.PP
+.B getkey
+ensure next token is object key. It parse key and match it to
+list of known keys provided in 
+.I k
+(returned by 
+.BR makekeys ).
+If match
+found, it will return index of that key in 
+.I a
+(array provided to
+.BR makekeys ).
+If match not found, it will return 
+.B UNK_KEY
+constant.
+If there are no more keys in this object it will return 
+.B END_OBJ
+constant.
+Will raise exception if next token isn't object key or 
+.SM } .
+.PP
+.B getnull
+check is next token is 
+.SM null
+, if yes then skip it and return 1,
+else do nothing and return 0. User expected to call 
+.B getnull
+when unsure
+is next value defined or null.
+.PP
+.B getbool
+ensure next token is 
+.SM true
+or 
+.SM false
+and skip it.
+If token was 
+.SM true
+return 1, else return 0.
+Will raise exception if next token isn't 
+.SM true
+or 
+.SM false .
+.PP
+.B gets
+ensure next token is string and return it (unquoted).
+Will raise exception if next token isn't string.
+.PP
+.B getr
+ensure next token is number and return it (as real).
+Will raise exception if next token isn't number.
+.PP
+.B getn
+ensure next token is number and return it (as int).
+If token was real number instead of integer, will leave unparsed tail on
+that token, and this most likely broke parsing next token.
+Will raise exception if next token isn't number.
+.PP
+.B skip
+skips next token, including complex tokens like objects or array.
+User expected to call it to skip values of UNK_KEY keys.
+Will raise exception if unable to skip token.
+.PP
+.B gettype
+check next token type and return one of these values for each
+token type: 
+.SM 0
+no more tokens, 
+.SM -1
+bad token,
++
+.I "
++ for string, +
+.I 0
++ for number,
++
+.I n
++ for null, +
+.I t
++ for true, +
+.I f
++ for false,
++
+.I {
++ for opening object, +
+.I }
++ for closing object,
++
+.I [
++ for opening array, +
+.I ]
++ for closing array.
+.PP
+.B end
+ensure there are no more tokens available.
+Will raise exception if there are more tokens available.
+.SH EXAMPLES
+.EX
+Struct: adt{
+        str: string;
+        r:   real;
+        opt: int;
+        arr: list of int;
+};
+
+F_STR, F_REAL, F_OPT, F_ARR: con iota;
+
+        keys := cjson->makekeys(array[] of {
+                F_STR   => "str",
+                F_REAL  => "real",
+                F_OPT   => "opt",
+                F_ARR   => "arr",
+        });
+
+        t := Token.new(array of byte "{\"real\": -2.3e2, \"arr\":[10,20]}");
+
+        struct := ref Struct;
+
+        t.openobj();
+OBJ:    for(;;) case t.getkey(keys) {
+        END_OBJ =>      break OBJ;
+        UNK_KEY =>      t.skip();
+        F_STR =>        struct.str = t.gets();
+        F_REAL =>       struct.r = t.getr();
+        F_OPT =>        if(!t.getnull())
+                                struct.opt = t.getn();
+        F_ARR =>        t.openarr();
+                        while(!t.closearr())
+                                struct.arr = t.getn() :: struct.arr;
+        }
+        t.closeobj();
+        t.end();
+
+.EE
+.SH SOURCE
+.PP
+.B /libinterp/cjson.c
+.br
+.SH SEE ALSO
+.PP
+.IR json (2)
+.SH BUGS
+.PP
+These bugs are intentional, to increase speed:
+.RS
+.IP •
+key names doesn't unquoted and must match literally
+.IP •
+true/false/null detected by first letter
+.IP •
+numbers with leading zeroes allowed
+.IP •
+structure doesn't 100% validated: 
+.I {"a":"b",}
+and 
+.I 1,
+are valid json
+.RE
