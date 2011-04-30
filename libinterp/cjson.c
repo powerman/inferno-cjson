@@ -50,30 +50,30 @@ cjsonmodinit(void)
 static Array*
 slice(Array* sa, int s, int e)
 {
-        Type *t;
-        Heap *h;
-        Array *a;
+	Type *t;
+	Heap *h;
+	Array *a;
 
 	if(s < 0 || s > e || e > sa->len)
 		error(exBounds);
 
-        t = sa->t;
-        h = heap(&Tarray);
-        a = H2D(Array*, h);
-        a->len = e - s;
-        a->data = sa->data + s*t->size;
-        a->t = t;
-        t->ref++;
+	t = sa->t;
+	h = heap(&Tarray);
+	a = H2D(Array*, h);
+	a->len = e - s;
+	a->data = sa->data + s*t->size;
+	a->t = t;
+	t->ref++;
 
-        if(sa->root != H)                       /* slicing a slice */
-                sa = sa->root;
+	if(sa->root != H)			/* slicing a slice */
+		sa = sa->root;
 
-        a->root = sa;
-        h = D2H(sa);
-        h->ref++;
-        Setmark(h);
+	a->root = sa;
+	h = D2H(sa);
+	h->ref++;
+	Setmark(h);
 
-        return a;
+	return a;
 }
 
 static uchar*
@@ -601,10 +601,10 @@ JSON2Token_gets(void *fp)
 		error(exNomem);
 	buflen = s + l;
 	l = 0;
-        // buflen        now cut buf at end of string (point to closing ")
-        // l             real length of str
-        // s             start pos in buf of next chunk to copy to str
-        // quote_pos     end   pos in buf of next chunk to copy to str (point to next \)
+	// buflen	 now cut buf at end of string (point to closing ")
+	// l		 real length of str
+	// s		 start pos in buf of next chunk to copy to str
+	// quote_pos	 end   pos in buf of next chunk to copy to str (point to next \)
 	for(;;){
 		memmove(str+l, buf+s, quote_pos - s);
 		l += quote_pos - s;
@@ -953,7 +953,7 @@ Token2JSON_new(void *fp)
 		sizehint = 16;
 
 	j = H2D(CJSON_Token2JSON*, heap(TToken2JSON));
-	j->buf   = H2D(Array*, heaparray(&Tbyte, sizehint));
+	j->buf	 = H2D(Array*, heaparray(&Tbyte, sizehint));
 	j->size  = 0;
 	j->stack = H2D(Array*, heaparray(&Tbyte, 16));
 	j->depth = 0;
@@ -984,9 +984,9 @@ Token2JSON_obj(void *fp)
 	
 	j->buf->data[j->size++] = '{';
 
-        h = D2H(j);
-        h->ref++;
-        Setmark(h);
+	h = D2H(j);
+	h->ref++;
+	Setmark(h);
 	*f->ret = j;
 }
 
@@ -1013,9 +1013,9 @@ Token2JSON_arr(void *fp)
 	
 	j->buf->data[j->size++] = '[';
 
-        h = D2H(j);
-        h->ref++;
-        Setmark(h);
+	h = D2H(j);
+	h->ref++;
+	Setmark(h);
 	*f->ret = j;
 }
 
@@ -1045,9 +1045,9 @@ Token2JSON_close(void *fp)
 	j->buf->data[j->size++] = j->stack->data[--j->depth];
 	j->buf->data[j->size++] = ',';
 
-        h = D2H(j);
-        h->ref++;
-        Setmark(h);
+	h = D2H(j);
+	h->ref++;
+	Setmark(h);
 	*f->ret = j;
 }
 
@@ -1085,9 +1085,9 @@ Token2JSON_key(void *fp)
 	j->buf->data[j->size++] = '"';
 	j->buf->data[j->size++] = ':';
 
-        h = D2H(j);
-        h->ref++;
-        Setmark(h);
+	h = D2H(j);
+	h->ref++;
+	Setmark(h);
 	*f->ret = j;
 }
 
@@ -1120,9 +1120,11 @@ Token2JSON_str(void *fp)
 	j->buf->data[j->size++] = '"';
 	j->buf->data[j->size++] = ',';
 
-        h = D2H(j);
-        h->ref++;
-        Setmark(h);
+	free(q);
+
+	h = D2H(j);
+	h->ref++;
+	Setmark(h);
 	*f->ret = j;
 }
 
@@ -1148,9 +1150,9 @@ Token2JSON_num(void *fp)
 	j->size += sprint(j->buf->data + j->size, "%d", n);
 	j->buf->data[j->size++] = ',';
 
-        h = D2H(j);
-        h->ref++;
-        Setmark(h);
+	h = D2H(j);
+	h->ref++;
+	Setmark(h);
 	*f->ret = j;
 }
 
@@ -1176,9 +1178,9 @@ Token2JSON_bignum(void *fp)
 	j->size += sprint(j->buf->data + j->size, "%lld", n);
 	j->buf->data[j->size++] = ',';
 
-        h = D2H(j);
-        h->ref++;
-        Setmark(h);
+	h = D2H(j);
+	h->ref++;
+	Setmark(h);
 	*f->ret = j;
 }
 
@@ -1204,9 +1206,9 @@ Token2JSON_realnum(void *fp)
 	j->size += sprint(j->buf->data + j->size, "%g", n);
 	j->buf->data[j->size++] = ',';
 
-        h = D2H(j);
-        h->ref++;
-        Setmark(h);
+	h = D2H(j);
+	h->ref++;
+	Setmark(h);
 	*f->ret = j;
 }
 
@@ -1243,9 +1245,9 @@ Token2JSON_bool(void *fp)
 	}
 	j->buf->data[j->size++] = ',';
 
-        h = D2H(j);
-        h->ref++;
-        Setmark(h);
+	h = D2H(j);
+	h->ref++;
+	Setmark(h);
 	*f->ret = j;
 }
 
@@ -1272,9 +1274,9 @@ Token2JSON_null(void *fp)
 	j->buf->data[j->size++] = 'l';
 	j->buf->data[j->size++] = ',';
 
-        h = D2H(j);
-        h->ref++;
-        Setmark(h);
+	h = D2H(j);
+	h->ref++;
+	Setmark(h);
 	*f->ret = j;
 }
 
