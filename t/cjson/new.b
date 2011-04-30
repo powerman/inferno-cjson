@@ -3,9 +3,9 @@ implement T;
 include "opt/powerman/tap/module/t.m";
 include "cjson.m";
 	cjson: CJSON;
-	Token: import cjson;
+	JSON2Token: import cjson;
 
-t: ref Token;
+t: ref JSON2Token;
 
 test()
 {
@@ -16,14 +16,14 @@ test()
 	plan(4);
 
 	mem:=getmem(); for(i:=0; i<10000; i++)
-	t = Token.new(array of byte "  true  ");
+	t = JSON2Token.new(array of byte "  true  ");
 	t = nil; ok_mem(mem);
 	
-	t = Token.new(array of byte "  true  ");
+	t = JSON2Token.new(array of byte "  true  ");
 	ok(t != nil, "t not nil");
 	eq_int(t.pos, 2, "skipped spaces");
 
-	t = Token.new(array of byte "[1,2]");
+	t = JSON2Token.new(array of byte "[1,2]");
 	eq_int(t.pos, 0, "nothing to skip");
 }
 

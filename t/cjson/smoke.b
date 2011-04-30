@@ -3,7 +3,7 @@ implement T;
 include "opt/powerman/tap/module/t.m";
 include "cjson.m";
 	cjson: CJSON;
-	Token, END_OBJ, UNK_KEY: import cjson;
+	JSON2Token, END_OBJ, UNK_KEY: import cjson;
 
 Struct: adt{
 	str: string;
@@ -44,7 +44,7 @@ test()
 		F_OPT3	=> "opt3",
 	});
 
-	t := Token.new(array of byte (
+	t := JSON2Token.new(array of byte (
 		  "{\n"
 		+ "\"str\":	\"Text…\",\n"
 		+ "\"int\":	-12,\n"
@@ -63,7 +63,7 @@ test()
 	struct.opt2 = -2;
 	struct.opt3 = -3;
 
-	t.openobj();
+	t.obj();
 OBJ:	for(;;) case t.getkey(keys) {
 	END_OBJ =>	break OBJ;
 	UNK_KEY =>	t.skip();
@@ -78,11 +78,11 @@ OBJ:	for(;;) case t.getkey(keys) {
 				struct.opt2 = t.getn();
 	F_OPT3 =>	if(!t.getnull())
 				struct.opt3 = t.getn();
-	F_ARR =>	t.openarr();
-			while(!t.closearr())
+	F_ARR =>	t.arr();
+			while(!t.close())
 				struct.arr = t.getn() :: struct.arr;
 	}
-	t.closeobj();
+	t.close();
 	t.end();
 
 	eq(struct.str, "Text…",	"str");

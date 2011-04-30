@@ -3,7 +3,7 @@ implement T;
 include "opt/powerman/tap/module/t.m";
 include "cjson.m";
 	cjson: CJSON;
-	Token: import cjson;
+	JSON2Token: import cjson;
 
 test()
 {
@@ -16,24 +16,24 @@ test()
 	json1 := array of byte "  {\"key\": \"value\", \"k2\" :[1, 2,{\"k\":0}],\"x\":-1}  ";
 
 	mem:=getmem(); for(i:=0; i<10000; i++)
-	{ t1 := Token.new(json1); t1.skip(); }
+	{ t1 := JSON2Token.new(json1); t1.skip(); }
 	ok_mem(mem);
 	
-	t := Token.new(array of byte "  ");
+	t := JSON2Token.new(array of byte "  ");
 	ex := "";
 	{ t.skip(); } exception e { "*" => ex = e; }
 	eq(ex, "unexpected EOF", "unexpected EOF");
 	
-	t = Token.new(array of byte " X ");
+	t = JSON2Token.new(array of byte " X ");
 	ex = "";
 	{ t.skip(); } exception e { "*" => ex = e; }
 	eq(ex, "expected json token", "expected json token");
 
-	t = Token.new(array of byte " \"X\" ");
+	t = JSON2Token.new(array of byte " \"X\" ");
 	t.skip();
 	eq_int(t.pos, 5, "skip string to EOF");
 
-	t = Token.new(array of byte " \"X\\\"Y\" , -2.3e+12 ,[],{},true,false,null");
+	t = JSON2Token.new(array of byte " \"X\\\"Y\" , -2.3e+12 ,[],{},true,false,null");
 	t.skip();
 	eq_int(t.pos, 10, "skip string");
 	t.skip();
@@ -49,11 +49,11 @@ test()
 	t.skip();
 	eq_int(t.pos, 41, "skip null");
 
-	t = Token.new(json1);
+	t = JSON2Token.new(json1);
 	t.skip();
 	eq_int(t.pos, len json1, "skip complex struct");
 
-	t = Token.new(array of byte "[1,2,3,X,5]");
+	t = JSON2Token.new(array of byte "[1,2,3,X,5]");
 	ex = "";
 	{ t.skip(); } exception e { "*" => ex = e; }
 	eq(ex, "expected json token", "expected json token (deep)");

@@ -3,7 +3,7 @@ implement T;
 include "opt/powerman/tap/module/t.m";
 include "cjson.m";
 	cjson: CJSON;
-	Token: import cjson;
+	JSON2Token: import cjson;
 
 test()
 {
@@ -16,33 +16,35 @@ test()
 	json1 := array of byte "  []  ";
 
 	mem:=getmem(); for(i:=0; i<10000; i++)
-	{ t1 := Token.new(json1); t1.openarr(); t1.closearr(); }
+	{ t1 := JSON2Token.new(json1); t1.arr(); t1.close(); }
 	ok_mem(mem);
 	
-	t := Token.new(array of byte "  ");
+	t := JSON2Token.new(array of byte "  ");
 	ex := "";
-	{ t.closearr(); } exception e { "*" => ex=e; }
+	{ t.close(); } exception e { "*" => ex=e; }
 	eq(ex, "unexpected EOF", "unexpected EOF");
 	
-	t = Token.new(array of byte " true ");
-	eq_int(t.closearr(), 0, "return 0");
+	t = JSON2Token.new(array of byte " true ");
+	t.stack[0] = byte ']';
+	t.depth = 1;
+	eq_int(t.close(), 0, "return 0");
 	eq_int(t.pos, 1, "pos wan't changed");
 
-	t = Token.new(array of byte " ] ");
+	t = JSON2Token.new(array of byte " ] ");
 	ex = "";
-	{ t.closearr(); } exception e { "*" => ex=e; }
-	eq(ex, "closing non-opened array", "closing non-opened array");
+	{ t.close(); } exception e { "*" => ex=e; }
+	eq(ex, "not end of current object/array", "not end of current object/array");
 
-	t = Token.new(array of byte " ] ");
-	t.stack[0] = byte '{';
+	t = JSON2Token.new(array of byte " ] ");
+	t.stack[0] = byte '}';
 	t.depth = 1;
 	ex = "";
-	{ t.closearr(); } exception e { "*" => ex=e; }
-	eq(ex, "closing non-opened array", "closing non-opened array");
+	{ t.close(); } exception e { "*" => ex=e; }
+	eq(ex, "not end of current object/array", "not end of current object/array");
 
-	t = Token.new(array of byte " []  ,  true ");
-	t.openarr();
-	eq_int(t.closearr(), 1, "return 1");
+	t = JSON2Token.new(array of byte " []  ,  true ");
+	t.arr();
+	eq_int(t.close(), 1, "return 1");
 	eq_int(t.pos, 8, "pos == 8");
 }
 

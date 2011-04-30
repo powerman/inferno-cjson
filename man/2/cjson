@@ -5,27 +5,40 @@ cjson \- fast JSON tokenizer
 .EX
 include "cjson.m";
         cjson: CJSON;
-        Token: import cjson;
-        END_OBJ, UNK_KEY: import cjson;
+        JSON2Token, Token2JSON, END_OBJ, UNK_KEY: import cjson;
 cjson = load CJSON CJSON->PATH;
 
-makekeys: fn(a: array of string): Keys;
+makekeys: fn(a: array of string): ref Keys;
 
-Token: adt{
-        new:            fn(a: array of byte): ref Token;
-        openobj:        fn(t: self ref Token);
-        closeobj:       fn(t: self ref Token);
-        openarr:        fn(t: self ref Token);
-        closearr:       fn(t: self ref Token): int;
-        getkey:         fn(t: self ref Token, k: Keys): int;
-        getnull:        fn(t: self ref Token): int;
-        getbool:        fn(t: self ref Token): int;
-        gets:           fn(t: self ref Token): string;
-        getr:           fn(t: self ref Token): real;
-        getn:           fn(t: self ref Token): int;
-        skip:           fn(t: self ref Token);
-        gettype:        fn(t: self ref Token): int;
-        end:            fn(t: self ref Token);
+JSON2Token: adt{
+        new:    fn(a: array of byte): ref JSON2Token;
+        obj:    fn(t: self ref JSON2Token);
+        arr:    fn(t: self ref JSON2Token);
+        close:  fn(t: self ref JSON2Token): int;
+        getkey: fn(t: self ref JSON2Token, k: ref Keys): int;
+        getnull:fn(t: self ref JSON2Token): int;
+        getbool:fn(t: self ref JSON2Token): int;
+        gets:   fn(t: self ref JSON2Token): string;
+        getr:   fn(t: self ref JSON2Token): real;
+        getn:   fn(t: self ref JSON2Token): int;
+        skip:   fn(t: self ref JSON2Token);
+        gettype:fn(t: self ref JSON2Token): int;
+        end:    fn(t: self ref JSON2Token);
+};
+
+Token2JSON: adt{
+        new:    fn(sizehint: int): ref Token2JSON;
+        obj:    fn(j: self ref Token2JSON): ref Token2JSON;
+        arr:    fn(j: self ref Token2JSON): ref Token2JSON;
+        close:  fn(j: self ref Token2JSON): ref Token2JSON;
+        key:    fn(j: self ref Token2JSON, k: ref Keys, id: int): ref Token2JSON;
+        str:    fn(j: self ref Token2JSON, s: string): ref Token2JSON;
+        num:    fn(j: self ref Token2JSON, n: int): ref Token2JSON;
+        bignum: fn(j: self ref Token2JSON, n: big): ref Token2JSON;
+        realnum:fn(j: self ref Token2JSON, n: real): ref Token2JSON;
+        bool:   fn(j: self ref Token2JSON, n: int): ref Token2JSON;
+        null:   fn(j: self ref Token2JSON): ref Token2JSON;
+        encode: fn(j: self ref Token2JSON): array of byte;
 };
 
 .EE
@@ -35,36 +48,39 @@ This module provide faster (in about 5 times) and ease to use alternative
 to 
 .IR json (2).
 .PP
-Writing JSON doesn't supported yet, it will be implemented later.
-.PP
-To parse as fast as possible it doesn't validate input strictly, and so
-may accept incorrectly formed JSON. Also it unable to return unknown
+To parse/generate as fast as possible it doesn't validate input strictly,
+and so may accept incorrectly formed JSON. Also it unable to return unknown
 object key names - all possible object key names must be precompiled using
 .B makekeys
 and provided to 
 .B getkey
-while parsing.
+while parsing or 
+.B key
+while generating.
 .PP
 .B makekeys
 return compiled form of known object keys. You may compile keys
 separately for each type of object, or compile all possible keys in all
 possible objects at once. You'll need returned value to call 
-.BR getkey .
+.B getkey
+and 
+.BR key .
 Usually 
 .B makekeys
 called only when your application initializes.
 Will raise exception on empty or duplicate keys in 
 .IR a .
+.SS Parsing JSON (JSON2Token)
 .PP
 .B new
 create and return new 
-.BR Token ,
+.BR JSON2Token ,
 which then should be used to parse
 JSON from 
 .I a
 (which should contain any amount of complete JSON values).
 .PP
-.B openobj
+.B obj
 ensure next token is 
 .SM {
 and skip it. Maximum depth of opened
@@ -72,14 +88,7 @@ objects/arrays currently limited to 16.
 Will raise exception if next token isn't 
 .SM { .
 .PP
-.B closeobj
-ensure next token is 
-.SM }
-and skip it.
-Will raise exception if next token isn't 
-.SM } .
-.PP
-.B openarr
+.B arr
 ensure next token is 
 .SM [
 and skip it. Maximum depth of opened
@@ -87,12 +96,23 @@ objects/arrays currently limited to 16.
 Will raise exception if next token isn't 
 .SM [ .
 .PP
-.B closearr
+.B close
+after opening 
+.B obj
+ensure next token is 
+.SM }
+and skip it and return 1.
+Will raise exception if next token isn't 
+.SM } .
+.PP
+.B close
+after opening 
+.B arr
 check is next token is 
 .SM ]
 , if yes then skip it and return 1,
 else do nothing and return 0. User expected to call 
-.B closearr
+.B close
 when unsure
 how many elements left in array and check returned value.
 .PP
@@ -191,6 +211,9 @@ bad token,
 .B end
 ensure there are no more tokens available.
 Will raise exception if there are more tokens available.
+.SS Generating JSON (Token2JSON)
+.PP
+TODO
 .SH EXAMPLES
 .EX
 Struct: adt{
@@ -209,11 +232,13 @@ F_STR, F_REAL, F_OPT, F_ARR: con iota;
                 F_ARR   => "arr",
         });
 
-        t := Token.new(array of byte "{\"real\": -2.3e2, \"arr\":[10,20]}");
-
         struct := ref Struct;
 
-        t.openobj();
+### Parsing
+
+        t := JSON2Token.new(array of byte "{\"real\": -2.3e2, \"arr\":[10,20]}");
+
+        t.obj();
 OBJ:    for(;;) case t.getkey(keys) {
         END_OBJ =>      break OBJ;
         UNK_KEY =>      t.skip();
@@ -221,12 +246,27 @@ OBJ:    for(;;) case t.getkey(keys) {
         F_REAL =>       struct.r = t.getr();
         F_OPT =>        if(!t.getnull())
                                 struct.opt = t.getn();
-        F_ARR =>        t.openarr();
-                        while(!t.closearr())
+        F_ARR =>        t.arr();
+                        while(!t.close())
                                 struct.arr = t.getn() :: struct.arr;
         }
-        t.closeobj();
+        t.close();
         t.end();
+
+### Generating
+
+        json := Token2JSON.new(128)
+                .obj()
+                .key(Keys, F_STR)       .str(struct.str)
+                .key(Keys, F_REAL)      .realnum(struct.r)
+                .key(Keys, F_OPT)       .num(struct.opt)
+                .key(Keys, F_ARR)       .arr();
+        for(l := struct.arr; l != nil; l = tl l)
+                json                    .num(hd l);
+        json                            .close()
+                .close();
+
+        text := string json.encode();
 
 .EE
 .SH SOURCE
@@ -240,8 +280,6 @@ OBJ:    for(;;) case t.getkey(keys) {
 .PP
 These bugs are intentional, to increase speed:
 .RS
-.IP •
-key names doesn't unquoted and must match literally
 .IP •
 true/false/null detected by first letter
 .IP •

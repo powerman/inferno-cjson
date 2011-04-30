@@ -3,7 +3,7 @@ implement T;
 include "opt/powerman/tap/module/t.m";
 include "cjson.m";
 	cjson: CJSON;
-	Token: import cjson;
+	JSON2Token: import cjson;
 
 F_SOURCE,
 F_SPORT,
@@ -19,7 +19,7 @@ F_X2,
 F_X,
 F_DATETIME: con iota;
 
-KEYS: CJSON->Keys;
+KEYS: ref CJSON->Keys;
 
 test()
 {
@@ -54,7 +54,7 @@ test()
 			F_SITE		=> "site",
 		});
 	} exception e { "*" => ex = e; }
-	eq(ex, "empty keys not supported", "empty keys not supported");
+	eq(ex, "", "empty keys ignored");
 
 	ex = "";
 	{	KEYS = cjson->makekeys(array[] of {
@@ -82,30 +82,32 @@ test()
 	});
 	ok(KEYS != nil, "KEYS not nil");
 
-	eq_int(len KEYS, 256, "len KEYS == 256");
+	K2ID := KEYS.key2id;
+
+	eq_int(len K2ID, 256, "len K2ID == 256");
 	nulls := 0;
-	for(i = 0; i < len KEYS; i++) case i {
-	'b' =>	ok(KEYS[i] != nil,			"[b] not nil");
-		ok(KEYS[i].n == nil,			"… n nil");
-		eq(string KEYS[i].tail, "ettype",	"… tail");
-		eq_int(KEYS[i].id, F_BETTYPE,		"… id");
-	'd' =>	ok(KEYS[i] != nil,			"[d] not nil");
-		ok(KEYS[i].n == nil,			"… n nil");
-		eq(string KEYS[i].tail, "atetime",	"… tail");
-		eq_int(KEYS[i].id, F_DATETIME,		"… id");
-	'g' =>	ok(KEYS[i] != nil,			"[g] not nil");
-		ok(KEYS[i].n == nil,			"… n nil");
-		eq(string KEYS[i].tail, "ame",		"… tail");
-		eq_int(KEYS[i].id, F_GAME,		"… id");
-	'h' =>	ok(KEYS[i] != nil,			"[h] not nil");
-		ok(KEYS[i].n == nil,			"… n nil");
-		eq(string KEYS[i].tail, "andicap",	"… tail");
-		eq_int(KEYS[i].id, F_HANDICAP,		"… id");
-	'n' =>	ok(KEYS[i] != nil,			"[n] not nil");
-		ok(KEYS[i].n != nil,			"… n not nil");
-		ok(KEYS[i].tail == nil,			"… tail nil");
-		eq_int(KEYS[i].id, CJSON->UNK_KEY,	"… id UNK_KEY");
-		next := KEYS[i].n;
+	for(i = 0; i < len K2ID; i++) case i {
+	'b' =>	ok(K2ID[i] != nil,			"[b] not nil");
+		ok(K2ID[i].n == nil,			"… n nil");
+		eq(string K2ID[i].tail, "ettype",	"… tail");
+		eq_int(K2ID[i].id, F_BETTYPE,		"… id");
+	'd' =>	ok(K2ID[i] != nil,			"[d] not nil");
+		ok(K2ID[i].n == nil,			"… n nil");
+		eq(string K2ID[i].tail, "atetime",	"… tail");
+		eq_int(K2ID[i].id, F_DATETIME,		"… id");
+	'g' =>	ok(K2ID[i] != nil,			"[g] not nil");
+		ok(K2ID[i].n == nil,			"… n nil");
+		eq(string K2ID[i].tail, "ame",		"… tail");
+		eq_int(K2ID[i].id, F_GAME,		"… id");
+	'h' =>	ok(K2ID[i] != nil,			"[h] not nil");
+		ok(K2ID[i].n == nil,			"… n nil");
+		eq(string K2ID[i].tail, "andicap",	"… tail");
+		eq_int(K2ID[i].id, F_HANDICAP,		"… id");
+	'n' =>	ok(K2ID[i] != nil,			"[n] not nil");
+		ok(K2ID[i].n != nil,			"… n not nil");
+		ok(K2ID[i].tail == nil,			"… tail nil");
+		eq_int(K2ID[i].id, CJSON->UNK_KEY,	"… id UNK_KEY");
+		next := K2ID[i].n;
 		nextnulls := 0;
 		ok(next['u'] != nil,			"… [u] not nil");
 		for(j := 0; j < len next; j++)
@@ -139,15 +141,15 @@ test()
 		ok(next['2'].tail == nil,		"… … … … tail nil [2]");
 		eq_int(next['1'].id, F_NUM1,		"… … … … id [1]");
 		eq_int(next['2'].id, F_NUM2,		"… … … … id [2]");
-	'p' =>	ok(KEYS[i] != nil,			"[p] not nil");
-		ok(KEYS[i].n == nil,			"… n nil");
-		eq(string KEYS[i].tail,	"layers",	"… tail");
-		eq_int(KEYS[i].id, F_PLAYERS,		"… id");
-	's' =>	ok(KEYS[i] != nil,			"[s] not nil");
-		ok(KEYS[i].n != nil,			"… n not nil");
-		ok(KEYS[i].tail == nil,			"… tail nil");
-		eq_int(KEYS[i].id, CJSON->UNK_KEY,	"… id UNK_KEY");
-		next := KEYS[i].n;
+	'p' =>	ok(K2ID[i] != nil,			"[p] not nil");
+		ok(K2ID[i].n == nil,			"… n nil");
+		eq(string K2ID[i].tail,	"layers",	"… tail");
+		eq_int(K2ID[i].id, F_PLAYERS,		"… id");
+	's' =>	ok(K2ID[i] != nil,			"[s] not nil");
+		ok(K2ID[i].n != nil,			"… n not nil");
+		ok(K2ID[i].tail == nil,			"… tail nil");
+		eq_int(K2ID[i].id, CJSON->UNK_KEY,	"… id UNK_KEY");
+		next := K2ID[i].n;
 		nextnulls := 0;
 		ok(next['i'] != nil,			"… [i] not nil");
 		ok(next['o'] != nil,			"… [o] not nil");
@@ -165,15 +167,15 @@ test()
 		eq_int(next['i'].id, F_SITE,		"… … id [i]");
 		eq_int(next['o'].id, F_SOURCE,		"… … id [o]");
 		eq_int(next['p'].id, F_SPORT,		"… … id [p]");
-	'v' =>	ok(KEYS[i] != nil,			"[v] not nil");
-		ok(KEYS[i].n == nil,			"… n nil");
-		eq(string KEYS[i].tail, "alue",		"… tail");
-		eq_int(KEYS[i].id, F_VALUE,		"… id");
-	'x' =>	ok(KEYS[i] != nil,                      "[x] not nil");
-		ok(KEYS[i].n != nil,			"… n not nil");
-		ok(KEYS[i].tail == nil,			"… tail");
-		eq_int(KEYS[i].id, F_X,			"… id");
-		next := KEYS[i].n;
+	'v' =>	ok(K2ID[i] != nil,			"[v] not nil");
+		ok(K2ID[i].n == nil,			"… n nil");
+		eq(string K2ID[i].tail, "alue",		"… tail");
+		eq_int(K2ID[i].id, F_VALUE,		"… id");
+	'x' =>	ok(K2ID[i] != nil,                      "[x] not nil");
+		ok(K2ID[i].n != nil,			"… n not nil");
+		ok(K2ID[i].tail == nil,			"… tail");
+		eq_int(K2ID[i].id, F_X,			"… id");
+		next := K2ID[i].n;
 		nextnulls := 0;
 		ok(next['2'] != nil,			"… … [2] not nil");
 		for(j := 0; j < len next; j++)
@@ -183,7 +185,7 @@ test()
 		ok(next['2'].n == nil,			"… … n nil");
 		ok(next['2'].tail == nil,		"… … tail");
 		eq_int(next['2'].id, F_X2,		"… … id");
-	* =>	if (KEYS[i] == nil)
+	* =>	if (K2ID[i] == nil)
 			nulls++;
 	}
 	eq_int(nulls, 256-9, "all other elements nil");

@@ -5,14 +5,12 @@
 #include "raise.h"
 #include "cjsonmod.h"
 
-static char exEmptyKey[]		= "empty keys not supported";
 static char exDupKey[]			= "duplicate keys";
+static char exNilKeys[]			= "prepare keys with makekeys() first";
 static char exTokenEOF[]		= "unexpected EOF";
-static char exTokenStack[]		= "stack overflow";
-static char exTokenStackNonObj[]	= "closing non-opened object";
-static char exTokenStackNonArr[]	= "closing non-opened array";
+static char exStack[]			= "stack overflow";
+static char exStackNotEnd[]		= "not end of current object/array";
 static char exTokenExpectObj[]		= "expected '{'";
-static char exTokenExpectEndObj[]	= "expected '}'";
 static char exTokenExpectArr[]		= "expected '['";
 static char exTokenExpectStr[]		= "expected '\"'";
 static char exTokenNonTerminatedStr[]	= "non-terminated string";
@@ -22,11 +20,16 @@ static char exTokenBadUnicode[]		= "bad \\u in string";
 static char exTokenExpectNumber[]	= "expected number";
 static char exTokenExpectEOF[]		= "expected EOF";
 static char exTokenExpectToken[]	= "expected json token";
+static char exJSONIncomplete[]		= "incomplete json";
 
+static Type* TJSON2Token;
+static Type* TToken2JSON;
 static Type* TNode;
-static Type* TToken;
+static Type* TKeys;
+static uchar JSON2Token_map[]		= CJSON_JSON2Token_map;
+static uchar Token2JSON_map[]		= CJSON_Token2JSON_map;
 static uchar Node_map[]			= CJSON_Node_map;
-static uchar Token_map[]		= CJSON_Token_map;
+static uchar Keys_map[]			= CJSON_Keys_map;
 
 #define SKIPSP()				\
 	for(; t->pos < buflen; t->pos++)	\
@@ -38,8 +41,10 @@ cjsonmodinit(void)
 {
 	builtinmod("$CJSON", CJSONmodtab, CJSONmodlen);
 
+	TJSON2Token = dtype(freeheap, CJSON_JSON2Token_size, JSON2Token_map, sizeof(JSON2Token_map));
+	TToken2JSON = dtype(freeheap, CJSON_Token2JSON_size, Token2JSON_map, sizeof(Token2JSON_map));
 	TNode = dtype(freeheap, CJSON_Node_size, Node_map, sizeof(Node_map));
-	TToken = dtype(freeheap, CJSON_Token_size, Token_map, sizeof(Token_map));
+	TKeys = dtype(freeheap, CJSON_Keys_size, Keys_map, sizeof(Keys_map));
 }
 
 static Array*
@@ -71,19 +76,117 @@ slice(Array* sa, int s, int e)
         return a;
 }
 
+static uchar*
+quote(uchar *s, int *qlen)
+{
+	uchar *q, *sp, *qp;
+	int prefixlen, len, h;
+
+	for(sp = s; *sp != '\0'; sp++)
+		if(*sp < 0x20 || *sp == '"' || *sp == '\\' || *sp == '/')
+			break;
+	
+	if(*sp == '\0'){
+		*qlen = sp - s;
+		q = malloc(*qlen + 1);
+		memmove(q, s, *qlen + 1);
+		return q;
+	}
+
+	prefixlen = len = sp - s;
+	for(; *sp != '\0'; sp++)
+		if(*sp < 0x20)
+			len += 6;
+		else if(*sp == '"' || *sp == '\\' || *sp == '/')
+			len += 2;
+		else
+			len++;
+
+	*qlen = len;
+	q = malloc(*qlen + 1);
+	memmove(q, s, prefixlen);
+
+	for(sp = s+prefixlen, qp = q+prefixlen; *sp != '\0'; sp++)
+		switch(*sp){
+		default:
+			if(*sp >= 0x20)
+				*qp++ = *sp;
+			else{
+				*qp++ = '\\';
+				*qp++ = 'u';
+				*qp++ = '0';
+				*qp++ = '0';
+				h = (*sp >> 4) & 0xF;
+				if(h <= 9)	*qp++ = h + '0';
+				else		*qp++ = h + 'a';
+				h = (*sp) & 0xF;
+				if(h <= 9)	*qp++ = h + '0';
+				else		*qp++ = h + 'a';
+			}
+			break;
+		case '"':
+			*qp++ = '\\';
+			*qp++ = '"';
+			break;
+		case '\\':
+			*qp++ = '\\';
+			*qp++ = '\\';
+			break;
+		case '/':
+			*qp++ = '\\';
+			*qp++ = '/';
+			break;
+		case '\n':
+			*qp++ = '\\';
+			*qp++ = 'n';
+			break;
+		case '\t':
+			*qp++ = '\\';
+			*qp++ = 't';
+			break;
+		case '\r':
+			*qp++ = '\\';
+			*qp++ = 'r';
+			break;
+		case '\b':
+			*qp++ = '\\';
+			*qp++ = 'b';
+			break;
+		case '\f':
+			*qp++ = '\\';
+			*qp++ = 'f';
+			break;
+		}
+	*qp = '\0';
+	return q;
+}
+
+static void
+extendbuf(CJSON_Token2JSON *j)
+{
+	Array *new;
+
+	new = H2D(Array*, heaparray(&Tbyte, 2 * j->buf->len));
+	memmove(new->data, j->buf->data, j->size);
+	destroy(j->buf);
+	j->buf = new;
+}
+
 void
 CJSON_makekeys(void *fp)
 {
 	F_CJSON_makekeys *f;
 	Array *a;
 	void *tmp;
-	Array *keys, *k;
+	Array *id2key, *key2id, *k;
 	int i, j;
 	uchar *b, c;
 	int blen;
 	String **adata;
+	Array **idata;
 	CJSON_Node **kdata, **ndata;
 	CJSON_Node *n, *n2;
+	CJSON_Keys *keys;
 
 	f = fp;
 	a = f->a;
@@ -92,14 +195,22 @@ CJSON_makekeys(void *fp)
 	destroy(tmp);
 	adata = (String**)a->data;
 
-	keys = H2D(Array*, heaparray(&Tptr, 256));
+	id2key = H2D(Array*, heaparray(&Tptr, a->len));
+	key2id = H2D(Array*, heaparray(&Tptr, 256));
+	idata  = (Array**)id2key->data;
 
 	for(i = 0; i < a->len; i++){
-		k = keys;
-		b = string2c(adata[i]);
-		blen = strlen(b);
-		if(blen == 0)
-			error(exEmptyKey);
+		b = quote(string2c(adata[i]), &blen);
+		if(blen == 0){
+			free(b);
+			continue;
+		}
+		idata[i] = H2D(Array*, heaparray(&Tbyte, blen));
+		memmove(idata[i]->data, b, blen);
+		free(b);
+		b = idata[i]->data;	// no \0 at end anymore
+
+		k = key2id;
 		for(j = 0; j < blen; j++){
 			c = b[j];
 			kdata = (CJSON_Node**)k->data;
@@ -137,16 +248,19 @@ CJSON_makekeys(void *fp)
 		}
 	}
 
+	keys = H2D(CJSON_Keys*, heap(TKeys));
+	keys->id2key = id2key;
+	keys->key2id = key2id;
 	*f->ret = keys;
 }
 
 void
-Token_new(void *fp)
+JSON2Token_new(void *fp)
 {
-	F_Token_new *f;
+	F_JSON2Token_new *f;
 	Array *a;
 	void *tmp;
-	CJSON_Token *t;
+	CJSON_JSON2Token *t;
 	Heap *h;
 	uchar *buf;
 	int buflen;
@@ -157,7 +271,7 @@ Token_new(void *fp)
 	*f->ret = H;
 	destroy(tmp);
 
-	t = H2D(CJSON_Token*, heap(TToken));
+	t = H2D(CJSON_JSON2Token*, heap(TJSON2Token));
 	t->buf = a;
 	h = D2H(a);
 	h->ref++;
@@ -175,10 +289,10 @@ Token_new(void *fp)
 }
 
 void
-Token_openobj(void *fp)
+JSON2Token_obj(void *fp)
 {
-	F_Token_openobj *f;
-	CJSON_Token *t;
+	F_JSON2Token_obj *f;
+	CJSON_JSON2Token *t;
 	uchar *buf;
 	int buflen;
 
@@ -196,48 +310,17 @@ Token_openobj(void *fp)
 	t->pos++;
 
 	if(t->depth == t->stack->len)
-		error(exTokenStack);
-	t->stack->data[t->depth++] = '{';
+		error(exStack);
+	t->stack->data[t->depth++] = '}';
 
 	SKIPSP();
 }
 
 void
-Token_closeobj(void *fp)
+JSON2Token_arr(void *fp)
 {
-	F_Token_closeobj *f;
-	CJSON_Token *t;
-	uchar *buf;
-	int buflen;
-
-	f = fp;
-	t = f->t;
-
-	buf = (uchar*)t->buf->data;
-	buflen = t->buf->len;
-
-	if(t->pos >= buflen)
-		error(exTokenEOF);
-	if(buf[t->pos] != '}')
-		error(exTokenExpectEndObj);
-
-	t->pos++;
-
-	if(t->depth == 0 || t->stack->data[--t->depth] != '{')
-		error(exTokenStackNonObj);
-	
-	SKIPSP();
-	if(t->pos != buflen && buf[t->pos] == ','){
-		t->pos++;
-		SKIPSP();
-	}
-}
-
-void
-Token_openarr(void *fp)
-{
-	F_Token_openarr *f;
-	CJSON_Token *t;
+	F_JSON2Token_arr *f;
+	CJSON_JSON2Token *t;
 	uchar *buf;
 	int buflen;
 
@@ -255,17 +338,17 @@ Token_openarr(void *fp)
 	t->pos++;
 
 	if(t->depth == t->stack->len)
-		error(exTokenStack);
-	t->stack->data[t->depth++] = '[';
+		error(exStack);
+	t->stack->data[t->depth++] = ']';
 
 	SKIPSP();
 }
 
 void
-Token_closearr(void *fp)
+JSON2Token_close(void *fp)
 {
-	F_Token_closearr *f;
-	CJSON_Token *t;
+	F_JSON2Token_close *f;
+	CJSON_JSON2Token *t;
 	uchar *buf;
 	int buflen;
 
@@ -277,16 +360,18 @@ Token_closearr(void *fp)
 
 	if(t->pos >= buflen)
 		error(exTokenEOF);
-	if(buf[t->pos] != ']'){
+
+	if(t->depth != 0 && t->stack->data[t->depth - 1] == buf[t->pos])
+		--t->depth;
+	else{
+		if(t->depth == 0 || t->stack->data[t->depth - 1] == '}')
+			error(exStackNotEnd);
 		*f->ret = 0;
 		return;
 	}
 
 	t->pos++;
 
-	if(t->depth == 0 || t->stack->data[--t->depth] != '[')
-		error(exTokenStackNonArr);
-	
 	SKIPSP();
 	if(t->pos != buflen && buf[t->pos] == ','){
 		t->pos++;
@@ -297,10 +382,10 @@ Token_closearr(void *fp)
 }
 
 void
-Token_getkey(void *fp)
+JSON2Token_getkey(void *fp)
 {
-	F_Token_getkey *f;
-	CJSON_Token *t;
+	F_JSON2Token_getkey *f;
+	CJSON_JSON2Token *t;
 	Array *k;
 	uchar *buf;
 	int buflen;
@@ -310,7 +395,9 @@ Token_getkey(void *fp)
 
 	f = fp;
 	t = f->t;
-	k = f->k;
+	if(f->k == H)
+		error(exNilKeys);
+	k = f->k->key2id;
 
 	buf = (uchar*)t->buf->data;
 	buflen = t->buf->len;
@@ -365,10 +452,10 @@ UNK_KEY:
 }
 
 void
-Token_getnull(void *fp)
+JSON2Token_getnull(void *fp)
 {
-	F_Token_getnull *f;
-	CJSON_Token *t;
+	F_JSON2Token_getnull *f;
+	CJSON_JSON2Token *t;
 	uchar *buf;
 	int buflen;
 
@@ -403,10 +490,10 @@ Token_getnull(void *fp)
 }
 
 void
-Token_getbool(void *fp)
+JSON2Token_getbool(void *fp)
 {
-	F_Token_getbool *f;
-	CJSON_Token *t;
+	F_JSON2Token_getbool *f;
+	CJSON_JSON2Token *t;
 	uchar *buf;
 	int buflen;
 
@@ -455,10 +542,10 @@ Token_getbool(void *fp)
 }
 
 void
-Token_gets(void *fp)
+JSON2Token_gets(void *fp)
 {
-	F_Token_gets *f;
-	CJSON_Token *t;
+	F_JSON2Token_gets *f;
+	CJSON_JSON2Token *t;
 	void *tmp;
 	uchar *buf;
 	int buflen;
@@ -580,10 +667,10 @@ Token_gets(void *fp)
 }
 
 void
-Token_getr(void *fp)
+JSON2Token_getr(void *fp)
 {
-	F_Token_getr *f;
-	CJSON_Token *t;
+	F_JSON2Token_getr *f;
+	CJSON_JSON2Token *t;
 	uchar *buf;
 	int buflen;
 	int is_str;
@@ -637,10 +724,10 @@ Token_getr(void *fp)
 }
 
 void
-Token_getn(void *fp)
+JSON2Token_getn(void *fp)
 {
-	F_Token_getn *f;
-	CJSON_Token *t;
+	F_JSON2Token_getn *f;
+	CJSON_JSON2Token *t;
 	uchar *buf;
 	int buflen;
 	int is_str;
@@ -694,10 +781,10 @@ Token_getn(void *fp)
 }
 
 void
-Token_skip(void *fp)
+JSON2Token_skip(void *fp)
 {
-	F_Token_gets *f;
-	CJSON_Token *t;
+	F_JSON2Token_gets *f;
+	CJSON_JSON2Token *t;
 	uchar *buf;
 	int buflen;
 
@@ -747,7 +834,7 @@ Token_skip(void *fp)
 		SKIPSP();
 
 		while(t->pos < buflen && buf[t->pos] != ']')
-			Token_skip(fp);
+			JSON2Token_skip(fp);
 		if(t->pos >= buflen)
 			error(exTokenEOF);
 		t->pos++;
@@ -777,7 +864,7 @@ Token_skip(void *fp)
 
 			SKIPSP();
 
-			Token_skip(fp);
+			JSON2Token_skip(fp);
 		}
 		if(t->pos >= buflen)
 			error(exTokenEOF);
@@ -795,10 +882,10 @@ Token_skip(void *fp)
 }
 
 void
-Token_gettype(void *fp)
+JSON2Token_gettype(void *fp)
 {
-	F_Token_gettype *f;
-	CJSON_Token *t;
+	F_JSON2Token_gettype *f;
+	CJSON_JSON2Token *t;
 	uchar *buf;
 	int buflen;
 
@@ -832,10 +919,10 @@ Token_gettype(void *fp)
 }
 
 void
-Token_end(void *fp)
+JSON2Token_end(void *fp)
 {
-	F_Token_end *f;
-	CJSON_Token *t;
+	F_JSON2Token_end *f;
+	CJSON_JSON2Token *t;
 	uchar *buf;
 	int buflen;
 
@@ -846,5 +933,372 @@ Token_end(void *fp)
 
 	if(t->pos != buflen)
 		error(exTokenExpectEOF);
+}
+
+void
+Token2JSON_new(void *fp)
+{
+	F_Token2JSON_new *f;
+	int sizehint;
+	void *tmp;
+	CJSON_Token2JSON *j;
+
+	f = fp;
+	sizehint = f->sizehint;
+	tmp = *f->ret;
+	*f->ret = H;
+	destroy(tmp);
+
+	if(sizehint < 16)
+		sizehint = 16;
+
+	j = H2D(CJSON_Token2JSON*, heap(TToken2JSON));
+	j->buf   = H2D(Array*, heaparray(&Tbyte, sizehint));
+	j->size  = 0;
+	j->stack = H2D(Array*, heaparray(&Tbyte, 16));
+	j->depth = 0;
+
+	*f->ret = j;
+}
+
+void
+Token2JSON_obj(void *fp)
+{
+	F_Token2JSON_obj *f;
+	void *tmp;
+	CJSON_Token2JSON *j;
+	Heap *h;
+
+	f = fp;
+	j = f->j;
+	tmp = *f->ret;
+	*f->ret = H;
+	destroy(tmp);
+
+	if(j->depth == j->stack->len)
+		error(exStack);
+	j->stack->data[j->depth++] = '}';
+
+	if(j->buf->len - j->size < 1)
+		extendbuf(j);
+	
+	j->buf->data[j->size++] = '{';
+
+        h = D2H(j);
+        h->ref++;
+        Setmark(h);
+	*f->ret = j;
+}
+
+void
+Token2JSON_arr(void *fp)
+{
+	F_Token2JSON_arr *f;
+	void *tmp;
+	CJSON_Token2JSON *j;
+	Heap *h;
+
+	f = fp;
+	j = f->j;
+	tmp = *f->ret;
+	*f->ret = H;
+	destroy(tmp);
+
+	if(j->depth == j->stack->len)
+		error(exStack);
+	j->stack->data[j->depth++] = ']';
+
+	if(j->buf->len - j->size < 1)
+		extendbuf(j);
+	
+	j->buf->data[j->size++] = '[';
+
+        h = D2H(j);
+        h->ref++;
+        Setmark(h);
+	*f->ret = j;
+}
+
+void
+Token2JSON_close(void *fp)
+{
+	F_Token2JSON_close *f;
+	void *tmp;
+	CJSON_Token2JSON *j;
+	Heap *h;
+
+	f = fp;
+	j = f->j;
+	tmp = *f->ret;
+	*f->ret = H;
+	destroy(tmp);
+
+	if(j->depth == 0)
+		error(exStack);
+
+	if(j->size > 0 && j->buf->data[j->size - 1] == ',')
+		j->size--;
+
+	if(j->buf->len - j->size < 2)
+		extendbuf(j);
+	
+	j->buf->data[j->size++] = j->stack->data[--j->depth];
+	j->buf->data[j->size++] = ',';
+
+        h = D2H(j);
+        h->ref++;
+        Setmark(h);
+	*f->ret = j;
+}
+
+void
+Token2JSON_key(void *fp)
+{
+	F_Token2JSON_key *f;
+	void *tmp;
+	CJSON_Token2JSON *j;
+	Array *k;
+	int id;
+	Array *key;
+	Heap *h;
+
+	f = fp;
+	j = f->j;
+	if(f->k == H)
+		error(exNilKeys);
+	k = f->k->id2key;
+	id= f->id;
+	tmp = *f->ret;
+	*f->ret = H;
+	destroy(tmp);
+
+	if(!(0 <= id && id < k->len))
+		error(exBounds);
+	key = ((Array**)k->data)[id];
+
+	while(j->buf->len - j->size < 3 + key->len)
+		extendbuf(j);
+	
+	j->buf->data[j->size++] = '"';
+	memmove(j->buf->data + j->size, key->data, key->len);
+	j->size += key->len;
+	j->buf->data[j->size++] = '"';
+	j->buf->data[j->size++] = ':';
+
+        h = D2H(j);
+        h->ref++;
+        Setmark(h);
+	*f->ret = j;
+}
+
+void
+Token2JSON_str(void *fp)
+{
+	F_Token2JSON_str *f;
+	void *tmp;
+	CJSON_Token2JSON *j;
+	String *s;
+	uchar *q;
+	int qlen;
+	Heap *h;
+
+	f = fp;
+	j = f->j;
+	s = f->s;
+	tmp = *f->ret;
+	*f->ret = H;
+	destroy(tmp);
+
+	q = quote(string2c(s), &qlen);
+
+	while(j->buf->len - j->size < 3 + qlen)
+		extendbuf(j);
+	
+	j->buf->data[j->size++] = '"';
+	memmove(j->buf->data + j->size, q, qlen);
+	j->size += qlen;
+	j->buf->data[j->size++] = '"';
+	j->buf->data[j->size++] = ',';
+
+        h = D2H(j);
+        h->ref++;
+        Setmark(h);
+	*f->ret = j;
+}
+
+void
+Token2JSON_num(void *fp)
+{
+	F_Token2JSON_num *f;
+	void *tmp;
+	CJSON_Token2JSON *j;
+	int n;
+	Heap *h;
+
+	f = fp;
+	j = f->j;
+	n = f->n;
+	tmp = *f->ret;
+	*f->ret = H;
+	destroy(tmp);
+
+	while(j->buf->len - j->size < 1 + 16)
+		extendbuf(j);
+	
+	j->size += sprint(j->buf->data + j->size, "%d", n);
+	j->buf->data[j->size++] = ',';
+
+        h = D2H(j);
+        h->ref++;
+        Setmark(h);
+	*f->ret = j;
+}
+
+void
+Token2JSON_bignum(void *fp)
+{
+	F_Token2JSON_bignum *f;
+	void *tmp;
+	CJSON_Token2JSON *j;
+	long n;
+	Heap *h;
+
+	f = fp;
+	j = f->j;
+	n = f->n;
+	tmp = *f->ret;
+	*f->ret = H;
+	destroy(tmp);
+
+	while(j->buf->len - j->size < 1 + 16)
+		extendbuf(j);
+	
+	j->size += sprint(j->buf->data + j->size, "%lld", n);
+	j->buf->data[j->size++] = ',';
+
+        h = D2H(j);
+        h->ref++;
+        Setmark(h);
+	*f->ret = j;
+}
+
+void
+Token2JSON_realnum(void *fp)
+{
+	F_Token2JSON_realnum *f;
+	void *tmp;
+	CJSON_Token2JSON *j;
+	double n;
+	Heap *h;
+
+	f = fp;
+	j = f->j;
+	n = f->n;
+	tmp = *f->ret;
+	*f->ret = H;
+	destroy(tmp);
+
+	while(j->buf->len - j->size < 1 + 32)
+		extendbuf(j);
+	
+	j->size += sprint(j->buf->data + j->size, "%g", n);
+	j->buf->data[j->size++] = ',';
+
+        h = D2H(j);
+        h->ref++;
+        Setmark(h);
+	*f->ret = j;
+}
+
+void
+Token2JSON_bool(void *fp)
+{
+	F_Token2JSON_bool *f;
+	void *tmp;
+	CJSON_Token2JSON *j;
+	int n;
+	Heap *h;
+
+	f = fp;
+	j = f->j;
+	n = f->n;
+	tmp = *f->ret;
+	*f->ret = H;
+	destroy(tmp);
+
+	while(j->buf->len - j->size < 1 + 5)
+		extendbuf(j);
+	
+	if(n == 0){
+		j->buf->data[j->size++] = 'f';
+		j->buf->data[j->size++] = 'a';
+		j->buf->data[j->size++] = 'l';
+		j->buf->data[j->size++] = 's';
+		j->buf->data[j->size++] = 'e';
+	}else{
+		j->buf->data[j->size++] = 't';
+		j->buf->data[j->size++] = 'r';
+		j->buf->data[j->size++] = 'u';
+		j->buf->data[j->size++] = 'e';
+	}
+	j->buf->data[j->size++] = ',';
+
+        h = D2H(j);
+        h->ref++;
+        Setmark(h);
+	*f->ret = j;
+}
+
+void
+Token2JSON_null(void *fp)
+{
+	F_Token2JSON_bool *f;
+	void *tmp;
+	CJSON_Token2JSON *j;
+	Heap *h;
+
+	f = fp;
+	j = f->j;
+	tmp = *f->ret;
+	*f->ret = H;
+	destroy(tmp);
+
+	while(j->buf->len - j->size < 1 + 4)
+		extendbuf(j);
+	
+	j->buf->data[j->size++] = 'n';
+	j->buf->data[j->size++] = 'u';
+	j->buf->data[j->size++] = 'l';
+	j->buf->data[j->size++] = 'l';
+	j->buf->data[j->size++] = ',';
+
+        h = D2H(j);
+        h->ref++;
+        Setmark(h);
+	*f->ret = j;
+}
+
+void
+Token2JSON_encode(void *fp)
+{
+	F_Token2JSON_encode *f;
+	void *tmp;
+	CJSON_Token2JSON *j;
+	int n;
+
+	f = fp;
+	j = f->j;
+	tmp = *f->ret;
+	*f->ret = H;
+	destroy(tmp);
+
+	if(j->depth != 0)
+		error(exJSONIncomplete);
+
+	n = j->size;
+	if(j->size > 0 && j->buf->data[j->size - 1] == ',')
+		n--;
+
+	*f->ret = slice(j->buf, 0, n);
 }
 
