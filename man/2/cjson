@@ -257,10 +257,10 @@ OBJ:    for(;;) case t.getkey(keys) {
 
         json := Token2JSON.new(128)
                 .obj()
-                .key(Keys, F_STR)       .str(struct.str)
-                .key(Keys, F_REAL)      .realnum(struct.r)
-                .key(Keys, F_OPT)       .num(struct.opt)
-                .key(Keys, F_ARR)       .arr();
+                .key(keys, F_STR)       .str(struct.str)
+                .key(keys, F_REAL)      .realnum(struct.r)
+                .key(keys, F_OPT)       .num(struct.opt)
+                .key(keys, F_ARR)       .arr();
         for(l := struct.arr; l != nil; l = tl l)
                 json                    .num(hd l);
         json                            .close()
