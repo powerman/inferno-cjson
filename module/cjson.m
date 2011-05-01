@@ -49,6 +49,7 @@ CJSON: module
 		size:	int;
 		stack:	array of byte;
 		depth:	int;
+		expect: int;
 	};
 
 	# Internal:

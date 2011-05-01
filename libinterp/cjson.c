@@ -22,6 +22,8 @@ static char exTokenBadUnicode[]		= "cjson:bad \\u in string";
 static char exTokenExpectNumber[]	= "cjson:expected number";
 static char exTokenExpectEOF[]		= "cjson:expected EOF";
 static char exTokenExpectToken[]	= "cjson:expected json token";
+static char exJSONExpectKey[]		= "cjson:key expected";
+static char exJSONExpectNonKey[]	= "cjson:non-key expected";
 static char exJSONIncomplete[]		= "cjson:incomplete json";
 
 static Type* TJSON2Token;
@@ -972,6 +974,7 @@ Token2JSON_new(void *fp)
 	j->size  = 0;
 	j->stack = H2D(Array*, heaparray(&Tbyte, 16));
 	j->depth = 0;
+	j->expect= 0; // value list
 
 	*f->ret = j;
 }
@@ -998,6 +1001,10 @@ Token2JSON_obj(void *fp)
 		extendbuf(j);
 	
 	j->buf->data[j->size++] = '{';
+
+        if(j->expect > 0)
+                error(exJSONExpectKey);
+	j->expect = 1; // key
 
 	h = D2H(j);
 	h->ref++;
@@ -1027,6 +1034,10 @@ Token2JSON_arr(void *fp)
 		extendbuf(j);
 	
 	j->buf->data[j->size++] = '[';
+
+        if(j->expect > 0)
+                error(exJSONExpectKey);
+	j->expect = 0; // value list
 
 	h = D2H(j);
 	h->ref++;
@@ -1059,6 +1070,11 @@ Token2JSON_close(void *fp)
 	
 	j->buf->data[j->size++] = j->stack->data[--j->depth];
 	j->buf->data[j->size++] = ',';
+
+	if(j->depth > 0 && j->stack->data[j->depth - 1] == '}')
+		j->expect = 1; // key
+	else
+		j->expect = 0; // value list
 
 	h = D2H(j);
 	h->ref++;
@@ -1102,6 +1118,10 @@ Token2JSON_key(void *fp)
 	j->buf->data[j->size++] = '"';
 	j->buf->data[j->size++] = ':';
 
+	if(j->expect != 1)
+		error(exJSONExpectNonKey);
+	j->expect = -1; // value
+
 	h = D2H(j);
 	h->ref++;
 	Setmark(h);
@@ -1139,6 +1159,10 @@ Token2JSON_str(void *fp)
 
 	free(q);
 
+	if(j->expect > 0)
+		error(exJSONExpectKey);
+	j->expect *= -1;
+
 	h = D2H(j);
 	h->ref++;
 	Setmark(h);
@@ -1166,6 +1190,10 @@ Token2JSON_num(void *fp)
 	
 	j->size += sprint(j->buf->data + j->size, "%d", n);
 	j->buf->data[j->size++] = ',';
+
+	if(j->expect > 0)
+		error(exJSONExpectKey);
+	j->expect *= -1;
 
 	h = D2H(j);
 	h->ref++;
@@ -1195,6 +1223,10 @@ Token2JSON_bignum(void *fp)
 	j->size += sprint(j->buf->data + j->size, "%lld", n);
 	j->buf->data[j->size++] = ',';
 
+	if(j->expect > 0)
+		error(exJSONExpectKey);
+	j->expect *= -1;
+
 	h = D2H(j);
 	h->ref++;
 	Setmark(h);
@@ -1222,6 +1254,10 @@ Token2JSON_realnum(void *fp)
 	
 	j->size += sprint(j->buf->data + j->size, "%g", n);
 	j->buf->data[j->size++] = ',';
+
+	if(j->expect > 0)
+		error(exJSONExpectKey);
+	j->expect *= -1;
 
 	h = D2H(j);
 	h->ref++;
@@ -1262,6 +1298,10 @@ Token2JSON_bool(void *fp)
 	}
 	j->buf->data[j->size++] = ',';
 
+	if(j->expect > 0)
+		error(exJSONExpectKey);
+	j->expect *= -1;
+
 	h = D2H(j);
 	h->ref++;
 	Setmark(h);
@@ -1290,6 +1330,10 @@ Token2JSON_null(void *fp)
 	j->buf->data[j->size++] = 'l';
 	j->buf->data[j->size++] = 'l';
 	j->buf->data[j->size++] = ',';
+
+	if(j->expect > 0)
+		error(exJSONExpectKey);
+	j->expect *= -1;
 
 	h = D2H(j);
 	h->ref++;

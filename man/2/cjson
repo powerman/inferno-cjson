@@ -357,9 +357,6 @@ OBJ:    for(;;) case t.getkey(keys) {
 .IR json (2)
 .SH BUGS
 .PP
-It's possible to intentionally generate incorrect JSON (inside object
-key-value-key-… sequence doesn't enforced).
-.PP
 These bugs are intentional, to increase speed:
 .RS
 .IP •
