@@ -34,31 +34,27 @@ test()
 	ok_mem(mem);
 	
 	t = JSON2Token.new(array of byte "  ");
-	ex := "";
-	{ t.getkey(KEYS); } exception e { "*" => ex=e; }
-	eq(ex, "unexpected EOF", "unexpected EOF");
+	{ t.getkey(KEYS); } exception e { "*" => catched(e); }
+	raised("cjson:unexpected EOF", nil);
 	
 	t = JSON2Token.new(array of byte " } ");
 	eq_int(t.getkey(KEYS), CJSON->END_OBJ, "end object");
 
 	t = JSON2Token.new(array of byte " 1 ");
-	ex = "";
-	{ t.getkey(KEYS); } exception e { "*" => ex=e; }
-	eq(ex, "expected '\"'", "expected '\"'");
+	{ t.getkey(KEYS); } exception e { "*" => catched(e); }
+	raised("cjson:expected '\"'", nil);
 	
 	t = JSON2Token.new(array of byte " \"keyxx : ");
-	ex = "";
-	{ t.getkey(KEYS); } exception e { "*" => ex=e; }
-	eq(ex, "non-terminated string", "non-terminated string");
+	{ t.getkey(KEYS); } exception e { "*" => catched(e); }
+	raised("cjson:non-terminated string", nil);
 
 	t = JSON2Token.new(array of byte " \"key\\\":xx\" : ");
 	eq_int(t.getkey(KEYS), F_QUOTED, "key\\\":xx");
 	eq_int(t.pos, 14, "skip quoted key");
 
 	t = JSON2Token.new(array of byte " \"keyxx\"  ");
-	ex = "";
-	{ t.getkey(KEYS); } exception e { "*" => ex=e; }
-	eq(ex, "expected ':'", "expected ':'");
+	{ t.getkey(KEYS); } exception e { "*" => catched(e); }
+	raised("cjson:expected ':'", nil);
 
 	t = JSON2Token.new(array of byte " \"keyxx\" : 123 ");
 	eq_int(t.getkey(KEYS), F_KEYXX, "KEYXX");

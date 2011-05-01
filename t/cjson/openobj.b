@@ -20,22 +20,19 @@ test()
 	ok_mem(mem);
 	
 	t := JSON2Token.new(array of byte "  ");
-	ex := "";
-	{ t.obj(); } exception e { "*" => ex=e; }
-	eq(ex, "unexpected EOF", "unexpected EOF");
+	{ t.obj(); } exception e { "*" => catched(e); }
+	raised("cjson:unexpected EOF", nil);
 	
 	t = JSON2Token.new(array of byte " true ");
-	ex = "";
-	{ t.obj(); } exception e { "*" => ex=e; }
-	eq(ex, "expected '{'", "expected '{'");
+	{ t.obj(); } exception e { "*" => catched(e); }
+	raised("cjson:expected '{'", nil);
 
 	t = JSON2Token.new(array of byte " {{{{{{{{{{{{{{{{{ ");
 	for(i=0;i<16;i++)
 		t.obj();
 	eq_int(t.depth, 16, "depth == 16");
-	ex = "";
-	{ t.obj(); } exception e { "*" => ex=e; }
-	eq(ex, "stack overflow", "stack overflow");
+	{ t.obj(); } exception e { "*" => catched(e); }
+	raised("cjson:stack overflow", nil);
 
 	t = JSON2Token.new(array of byte " { \"key\":46 } ");
 	t.obj();

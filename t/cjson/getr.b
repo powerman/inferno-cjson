@@ -20,19 +20,16 @@ test()
 	ok_mem(mem);
 	
 	t := JSON2Token.new(array of byte "  ");
-	ex := "";
-	{ t.getr(); } exception e { "*" => ex=e; }
-	eq(ex, "unexpected EOF", "unexpected EOF");
+	{ t.getr(); } exception e { "*" => catched(e); }
+	raised("cjson:unexpected EOF", nil);
 	
 	t = JSON2Token.new(array of byte " null ");
-	ex = "";
-	{ t.getr(); } exception e { "*" => ex=e; }
-	eq(ex, "expected number", "expected number");
+	{ t.getr(); } exception e { "*" => catched(e); }
+	raised("cjson:expected number", nil);
 	
 	t = JSON2Token.new(array of byte " \"0 ");
-	ex = "";
-	{ t.getr(); } exception e { "*" => ex=e; }
-	eq(ex, "non-terminated string", "non-terminated string");
+	{ t.getr(); } exception e { "*" => catched(e); }
+	raised("cjson:non-terminated string", nil);
 	
 	t = JSON2Token.new(array of byte "  \"-2.3e-3\" ,  null  ");
 	ok(t.getr() == -2.3e-3, "\"-2.3e-3\"");

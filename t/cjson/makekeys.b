@@ -47,23 +47,21 @@ test()
 	});
 	KEYS = nil; ok_mem(mem);
 	
-	ex := "";
 	{	KEYS = cjson->makekeys(array[] of {
 			F_SOURCE	=> "source",
 			F_SPORT		=> "",
 			F_SITE		=> "site",
 		});
-	} exception e { "*" => ex = e; }
-	eq(ex, "", "empty keys ignored");
+	} exception e { "*" => catched(e); }
+	raised("", "empty keys ignored");
 
-	ex = "";
 	{	KEYS = cjson->makekeys(array[] of {
 			F_SOURCE	=> "source",
 			F_SPORT		=> "source",
 			F_SITE		=> "site",
 		});
-	} exception e { "*" => ex = e; }
-	eq(ex, "duplicate keys", "duplicate keys");
+	} exception e { "*" => catched(e); }
+	raised("cjson:duplicate keys", nil);
 
 	KEYS = cjson->makekeys(array[] of {
 		F_SOURCE	=> "source",

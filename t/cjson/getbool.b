@@ -20,24 +20,20 @@ test()
 	ok_mem(mem);
 	
 	t := JSON2Token.new(array of byte "  ");
-	ex := "";
-	{ t.getbool(); } exception e { "*" => ex=e; }
-	eq(ex, "unexpected EOF", "unexpected EOF");
+	{ t.getbool(); } exception e { "*" => catched(e); }
+	raised("cjson:unexpected EOF", nil);
 	
 	t = JSON2Token.new(array of byte " null ");
-	ex = "";
-	{ t.getbool(); } exception e { "*" => ex=e; }
-	eq(ex, "expected true or false", "expected true or false");
+	{ t.getbool(); } exception e { "*" => catched(e); }
+	raised("cjson:expected true or false", nil);
 	
 	t = JSON2Token.new(array of byte "tru");
-	ex = "";
-	{ t.getbool(); } exception e { "*" => ex=e; }
-	eq(ex, "unexpected EOF", "unexpected EOF");
+	{ t.getbool(); } exception e { "*" => catched(e); }
+	raised("cjson:unexpected EOF", nil);
 	
 	t = JSON2Token.new(array of byte "fals");
-	ex = "";
-	{ t.getbool(); } exception e { "*" => ex=e; }
-	eq(ex, "unexpected EOF", "unexpected EOF");
+	{ t.getbool(); } exception e { "*" => catched(e); }
+	raised("cjson:unexpected EOF", nil);
 	
 	t = JSON2Token.new(array of byte "true");
 	eq_int(t.getbool(), 1, "return 1 on true");

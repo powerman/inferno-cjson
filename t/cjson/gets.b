@@ -20,19 +20,16 @@ test()
 	ok_mem(mem);
 	
 	t := JSON2Token.new(array of byte "  ");
-	ex := "";
-	{ t.gets(); } exception e { "*" => ex=e; }
-	eq(ex, "unexpected EOF", "unexpected EOF");
+	{ t.gets(); } exception e { "*" => catched(e); }
+	raised("cjson:unexpected EOF", nil);
 	
 	t = JSON2Token.new(array of byte " null ");
-	ex = "";
-	{ t.gets(); } exception e { "*" => ex=e; }
-	eq(ex, "expected '\"'", "expected '\"'");
+	{ t.gets(); } exception e { "*" => catched(e); }
+	raised("cjson:expected '\"'", nil);
 	
 	t = JSON2Token.new(array of byte " \" ");
-	ex = "";
-	{ t.gets(); } exception e { "*" => ex=e; }
-	eq(ex, "non-terminated string", "non-terminated string");
+	{ t.gets(); } exception e { "*" => catched(e); }
+	raised("cjson:non-terminated string", nil);
 	
 	t = JSON2Token.new(array of byte "  \"this is a string\" ,  null  ");
 	eq(t.gets(), "this is a string", "return string");
@@ -51,14 +48,12 @@ test()
 	eq(t.gets(), "Q", "return Q");
 
 	t = JSON2Token.new(array of byte "  \"\\u\" ,  null  ");
-	ex = "";
-	{ t.gets(); } exception e { "*" => ex=e; }
-	eq(ex, "bad \\u in string", "bad \\u in string");
+	{ t.gets(); } exception e { "*" => catched(e); }
+	raised("cjson:bad \\u in string", nil);
 
 	t = JSON2Token.new(array of byte "  \"\\u123-\" ,  null  ");
-	ex = "";
-	{ t.gets(); } exception e { "*" => ex=e; }
-	eq(ex, "bad \\u in string", "bad \\u in string");
+	{ t.gets(); } exception e { "*" => catched(e); }
+	raised("cjson:bad \\u in string", nil);
 
 	t = JSON2Token.new(array of byte "  \"<\\u0020>\" ,  null  ");
 	eq(t.gets(), "< >", "return \\u0020");

@@ -20,9 +20,8 @@ test()
 	ok_mem(mem);
 	
 	t := JSON2Token.new(array of byte "  ");
-	ex := "";
-	{ t.close(); } exception e { "*" => ex=e; }
-	eq(ex, "unexpected EOF", "unexpected EOF");
+	{ t.close(); } exception e { "*" => catched(e); }
+	raised("cjson:unexpected EOF", nil);
 	
 	t = JSON2Token.new(array of byte " true ");
 	t.stack[0] = byte ']';
@@ -31,16 +30,14 @@ test()
 	eq_int(t.pos, 1, "pos wan't changed");
 
 	t = JSON2Token.new(array of byte " ] ");
-	ex = "";
-	{ t.close(); } exception e { "*" => ex=e; }
-	eq(ex, "not end of current object/array", "not end of current object/array");
+	{ t.close(); } exception e { "*" => catched(e); }
+	raised("cjson:not end of current object/array", nil);
 
 	t = JSON2Token.new(array of byte " ] ");
 	t.stack[0] = byte '}';
 	t.depth = 1;
-	ex = "";
-	{ t.close(); } exception e { "*" => ex=e; }
-	eq(ex, "not end of current object/array", "not end of current object/array");
+	{ t.close(); } exception e { "*" => catched(e); }
+	raised("cjson:not end of current object/array", nil);
 
 	t = JSON2Token.new(array of byte " []  ,  true ");
 	t.arr();

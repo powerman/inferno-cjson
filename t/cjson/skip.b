@@ -20,14 +20,12 @@ test()
 	ok_mem(mem);
 	
 	t := JSON2Token.new(array of byte "  ");
-	ex := "";
-	{ t.skip(); } exception e { "*" => ex = e; }
-	eq(ex, "unexpected EOF", "unexpected EOF");
+	{ t.skip(); } exception e { "*" => catched(e); }
+	raised("cjson:unexpected EOF", nil);
 	
 	t = JSON2Token.new(array of byte " X ");
-	ex = "";
-	{ t.skip(); } exception e { "*" => ex = e; }
-	eq(ex, "expected json token", "expected json token");
+	{ t.skip(); } exception e { "*" => catched(e); }
+	raised("cjson:expected json token", nil);
 
 	t = JSON2Token.new(array of byte " \"X\" ");
 	t.skip();
@@ -54,8 +52,7 @@ test()
 	eq_int(t.pos, len json1, "skip complex struct");
 
 	t = JSON2Token.new(array of byte "[1,2,3,X,5]");
-	ex = "";
-	{ t.skip(); } exception e { "*" => ex = e; }
-	eq(ex, "expected json token", "expected json token (deep)");
+	{ t.skip(); } exception e { "*" => catched(e); }
+	raised("cjson:expected json token", "expected json token (deep)");
 }
 

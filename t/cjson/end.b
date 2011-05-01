@@ -20,9 +20,8 @@ test()
 	ok_mem(mem);
 	
 	t := JSON2Token.new(array of byte " null ");
-	ex := "";
-	{ t.end(); } exception e { "*" => ex=e; }
-	eq(ex, "expected EOF", "expected EOF");
+	{ t.end(); } exception e { "*" => catched(e); }
+	raised("cjson:expected EOF", nil);
 
 	t = JSON2Token.new(array of byte "  ");
 	t.end();

@@ -5,22 +5,24 @@
 #include "raise.h"
 #include "cjsonmod.h"
 
-static char exDupKey[]			= "duplicate keys";
-static char exNilKeys[]			= "prepare keys with makekeys() first";
-static char exTokenEOF[]		= "unexpected EOF";
-static char exStack[]			= "stack overflow";
-static char exStackNotEnd[]		= "not end of current object/array";
-static char exTokenExpectObj[]		= "expected '{'";
-static char exTokenExpectArr[]		= "expected '['";
-static char exTokenExpectStr[]		= "expected '\"'";
-static char exTokenNonTerminatedStr[]	= "non-terminated string";
-static char exTokenExpectColon[]	= "expected ':'";
-static char exTokenExpectBool[]		= "expected true or false";
-static char exTokenBadUnicode[]		= "bad \\u in string";
-static char exTokenExpectNumber[]	= "expected number";
-static char exTokenExpectEOF[]		= "expected EOF";
-static char exTokenExpectToken[]	= "expected json token";
-static char exJSONIncomplete[]		= "incomplete json";
+static char exDupKey[]			= "cjson:duplicate keys";
+static char exNilKeys[]			= "cjson:prepare keys with makekeys() first";
+static char exNoSuchKey[]		= "cjson:no such key";
+static char exEmptyKey[]		= "cjson:empty keys not supported";
+static char exTokenEOF[]		= "cjson:unexpected EOF";
+static char exStack[]			= "cjson:stack overflow";
+static char exStackNotEnd[]		= "cjson:not end of current object/array";
+static char exTokenExpectObj[]		= "cjson:expected '{'";
+static char exTokenExpectArr[]		= "cjson:expected '['";
+static char exTokenExpectStr[]		= "cjson:expected '\"'";
+static char exTokenNonTerminatedStr[]	= "cjson:non-terminated string";
+static char exTokenExpectColon[]	= "cjson:expected ':'";
+static char exTokenExpectBool[]		= "cjson:expected true or false";
+static char exTokenBadUnicode[]		= "cjson:bad \\u in string";
+static char exTokenExpectNumber[]	= "cjson:expected number";
+static char exTokenExpectEOF[]		= "cjson:expected EOF";
+static char exTokenExpectToken[]	= "cjson:expected json token";
+static char exJSONIncomplete[]		= "cjson:incomplete json";
 
 static Type* TJSON2Token;
 static Type* TToken2JSON;
@@ -193,10 +195,17 @@ CJSON_makekeys(void *fp)
 	tmp = *f->ret;
 	*f->ret = H;
 	destroy(tmp);
-	adata = (String**)a->data;
 
-	id2key = H2D(Array*, heaparray(&Tptr, a->len));
-	key2id = H2D(Array*, heaparray(&Tptr, 256));
+	keys = H2D(CJSON_Keys*, heap(TKeys));
+	keys->id2key = id2key = H2D(Array*, heaparray(&Tptr, a == H ? 0 : a->len));
+	keys->key2id = key2id = H2D(Array*, heaparray(&Tptr, 256));
+
+	if(a == H){
+		*f->ret = keys;
+		return;
+	}
+
+	adata  = (String**)a->data;
 	idata  = (Array**)id2key->data;
 
 	for(i = 0; i < a->len; i++){
@@ -248,9 +257,6 @@ CJSON_makekeys(void *fp)
 		}
 	}
 
-	keys = H2D(CJSON_Keys*, heap(TKeys));
-	keys->id2key = id2key;
-	keys->key2id = key2id;
 	*f->ret = keys;
 }
 
@@ -272,10 +278,14 @@ JSON2Token_new(void *fp)
 	destroy(tmp);
 
 	t = H2D(CJSON_JSON2Token*, heap(TJSON2Token));
-	t->buf = a;
-	h = D2H(a);
-	h->ref++;
-	Setmark(h);
+	if(a == H)
+		t->buf = H2D(Array*, heaparray(&Tbyte, 0));
+	else{
+		t->buf = a;
+		h = D2H(a);
+		h->ref++;
+		Setmark(h);
+	}
 	t->pos = 0;
 	t->stack = H2D(Array*, heaparray(&Tbyte, 16));
 	t->depth = 0;
@@ -1073,8 +1083,10 @@ Token2JSON_key(void *fp)
 	destroy(tmp);
 
 	if(!(0 <= id && id < k->len))
-		error(exBounds);
+		error(exNoSuchKey);
 	key = ((Array**)k->data)[id];
+	if(key == H)
+		error(exEmptyKey);
 
 	while(j->buf->len - j->size < 3 + key->len)
 		extendbuf(j);

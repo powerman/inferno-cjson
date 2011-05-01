@@ -35,9 +35,8 @@ test()
 	eq_int(t.pos, 5, "pos changed");
 
 	t = JSON2Token.new(array of byte " non");
-	ex := "";
-	{ t.getnull(); } exception e { "*" => ex=e; }
-	eq(ex, "unexpected EOF", "unexpected EOF");
+	{ t.getnull(); } exception e { "*" => catched(e); }
+	raised("cjson:unexpected EOF", nil);
 
 	t = JSON2Token.new(array of byte " null, ");
 	eq_int(t.getnull(), 1, "null");
