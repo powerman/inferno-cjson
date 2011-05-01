@@ -63,7 +63,7 @@ object key names - all possible object key names must be precompiled using
 separately for each type of object, or compile all possible keys in all
 possible objects at once. You'll need returned value to call *getkey* and *key*.
 Usually *makekeys* called only when your application initializes.
-Will raise exception on empty or duplicate keys in 'a'.
+Will raise exception on duplicate keys in 'a'.
 
 === Parsing JSON (JSON2Token) ===
 
@@ -127,7 +127,31 @@ Will raise exception if there are more tokens available.
 
 === Generating JSON (Token2JSON) ===
 
-TODO
+*new* create and return new *Token2JSON*, which then should be used to
+form JSON from tokens added by calling other methods, and finally
+generating JSON using *encode*. The 'sizehint' used to help choose initial
+size of buffer to store JSON. If it will be smaller than needed to keep
+generated JSON, buffer will automatically grow as needed, but this may
+slowdown JSON generation.
+
+All methods which append tokens return *Token2JSON* to allow calling them
+one after one as a chain (see EXAMPLES).
+
+*obj* append +'{'+.
+*arr* append +'['+.
+*close* append either +'}'+ or +']'+ to close current *obj* or *arr*.
+
+*key* append +"key name":+, and it need 'k' (returned by *makekeys*) and
+key's 'id' to find key name.
+
+*str* append quoted string 's'.
+*num*, *bignum* and *realnum* append number 'n'.
+
+*bool* append +true+ if 'n' != 0, or +false+ otherwise.
+*null* append +null+.
+
+*encode* return current JSON.
+Will raise if detect incomplete JSON (not closed *arr* or *obj*).
 
 
 EXAMPLES
@@ -199,6 +223,11 @@ json(2)
 
 BUGS
 ----
+Empty object's keys does not supported.
+
+It's possible to intentionally generate incorrect JSON (inside object
+key-value-key-… sequence doesn't enforced).
+
 These bugs are intentional, to increase speed:
 
 - true/false/null detected by first letter

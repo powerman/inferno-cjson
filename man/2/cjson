@@ -68,7 +68,7 @@ and
 Usually 
 .B makekeys
 called only when your application initializes.
-Will raise exception on empty or duplicate keys in 
+Will raise exception on duplicate keys in 
 .IR a .
 .SS Parsing JSON (JSON2Token)
 .PP
@@ -213,7 +213,83 @@ ensure there are no more tokens available.
 Will raise exception if there are more tokens available.
 .SS Generating JSON (Token2JSON)
 .PP
-TODO
+.B new
+create and return new 
+.BR Token2JSON ,
+which then should be used to
+form JSON from tokens added by calling other methods, and finally
+generating JSON using 
+.BR encode .
+The 
+.I sizehint
+used to help choose initial
+size of buffer to store JSON. If it will be smaller than needed to keep
+generated JSON, buffer will automatically grow as needed, but this may
+slowdown JSON generation.
+.PP
+All methods which append tokens return 
+.B Token2JSON
+to allow calling them
+one after one as a chain (see EXAMPLES).
+.PP
+.B obj
+append +
+.I {
++.
+.B arr
+append +
+.I [
++.
+.B close
+append either +
+.I }
++ or +
+.I ]
++ to close current 
+.B obj
+or 
+.BR arr .
+.PP
+.B key
+append 
+.SM "key name":
+, and it need 
+.I k
+(returned by 
+.BR makekeys )
+and
+key's 
+.I id
+to find key name.
+.PP
+.B str
+append quoted string 
+.IR s .
+.BR num ,
+.B bignum
+and 
+.B realnum
+append number 
+.IR n .
+.PP
+.B bool
+append 
+.SM true
+if 
+.I n
+!= 0, or 
+.SM false
+otherwise.
+.B null
+append 
+.SM null .
+.PP
+.B encode
+return current JSON.
+Will raise if detect incomplete JSON (not closed 
+.B arr
+or 
+.BR obj ).
 .SH EXAMPLES
 .EX
 Struct: adt{
@@ -277,6 +353,11 @@ OBJ:    for(;;) case t.getkey(keys) {
 .PP
 .IR json (2)
 .SH BUGS
+.PP
+Empty object's keys does not supported.
+.PP
+It's possible to intentionally generate incorrect JSON (inside object
+key-value-key-… sequence doesn't enforced).
 .PP
 These bugs are intentional, to increase speed:
 .RS
