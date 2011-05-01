@@ -11,7 +11,7 @@ SYNOPSIS
 ----
 include "cjson.m";
 	cjson: CJSON;
-	JSON2Token, Token2JSON, END_OBJ, UNK_KEY: import cjson;
+	JSON2Token, Token2JSON, END_OBJ, UNK_KEY, EMPTY_KEY: import cjson;
 cjson = load CJSON CJSON->PATH;
 
 makekeys: fn(a: array of string): ref Keys;
@@ -88,7 +88,8 @@ how many elements left in array and check returned value.
 *getkey* ensure next token is object key. It parse key and match it to
 list of known keys provided in 'k' (returned by *makekeys*). If match
 found, it will return index of that key in 'a' (array provided to
-*makekeys*). If match not found, it will return *UNK_KEY* constant.
+*makekeys*). For empty keys *EMPTY_KEY* constant returned.
+If match not found, it will return *UNK_KEY* constant.
 If there are no more keys in this object it will return *END_OBJ* constant.
 Will raise exception if next token isn't object key or +}+.
 
@@ -223,8 +224,6 @@ json(2)
 
 BUGS
 ----
-Empty object's keys does not supported.
-
 It's possible to intentionally generate incorrect JSON (inside object
 key-value-key-… sequence doesn't enforced).
 

@@ -3,7 +3,7 @@ implement T;
 include "opt/powerman/tap/module/t.m";
 include "cjson.m";
 	cjson: CJSON;
-	JSON2Token, Token2JSON, END_OBJ, UNK_KEY: import cjson;
+	JSON2Token, Token2JSON, END_OBJ, UNK_KEY, EMPTY_KEY: import cjson;
 
 test()
 {
@@ -11,7 +11,7 @@ test()
 	if(cjson == nil)
 		bail_out("fail to load CJSON");
 
-	plan(29);
+	plan(30);
 
 	keys : ref CJSON->Keys;
 	t : ref JSON2Token;
@@ -48,7 +48,7 @@ test()
 	ok(t != nil, "JSON2Token.new(array[0] of byte)");
 
 	t = JSON2Token.new(array of byte "\"\":");
-	eq_int(t.getkey(keys), UNK_KEY, "getkey() on empty key");
+	eq_int(t.getkey(keys), EMPTY_KEY, "getkey() on empty key");
 
 	{ t.getkey(nil); } exception e { "*" => catched(e); }
 	raised("cjson:prepare keys with makekeys() first", nil);
@@ -73,5 +73,6 @@ test()
 
 	{ j.str(nil); } exception e { "*" => catched(e); }
 	raised("", nil);
+	eq(string j.encode(), "\"\"", nil);
 }
 

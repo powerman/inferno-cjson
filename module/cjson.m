@@ -4,6 +4,7 @@ CJSON: module
 
 	END_OBJ: con -1;
 	UNK_KEY: con -2;
+	EMPTY_KEY: con -3;
 
 	makekeys: fn(a: array of string): ref Keys;
 

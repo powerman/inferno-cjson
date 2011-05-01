@@ -5,7 +5,7 @@ cjson \- fast JSON tokenizer
 .EX
 include "cjson.m";
         cjson: CJSON;
-        JSON2Token, Token2JSON, END_OBJ, UNK_KEY: import cjson;
+        JSON2Token, Token2JSON, END_OBJ, UNK_KEY, EMPTY_KEY: import cjson;
 cjson = load CJSON CJSON->PATH;
 
 makekeys: fn(a: array of string): ref Keys;
@@ -127,6 +127,9 @@ found, it will return index of that key in
 .I a
 (array provided to
 .BR makekeys ).
+For empty keys 
+.B EMPTY_KEY
+constant returned.
 If match not found, it will return 
 .B UNK_KEY
 constant.
@@ -353,8 +356,6 @@ OBJ:    for(;;) case t.getkey(keys) {
 .PP
 .IR json (2)
 .SH BUGS
-.PP
-Empty object's keys does not supported.
 .PP
 It's possible to intentionally generate incorrect JSON (inside object
 key-value-key-… sequence doesn't enforced).

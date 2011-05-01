@@ -439,6 +439,11 @@ JSON2Token_getkey(void *fp)
 
 	SKIPSP();
 
+	if(l == 0){
+		*f->ret = CJSON_EMPTY_KEY;
+		return;
+	}
+
 	for(i = 0; i < l; i++){
 		n = ((CJSON_Node**)k->data)[ buf[s+i] ];
 		if(n == H)
