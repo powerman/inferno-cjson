@@ -8,7 +8,7 @@
 static char exDupKey[]			= "cjson:duplicate keys";
 static char exNilKeys[]			= "cjson:prepare keys with makekeys() first";
 static char exNoSuchKey[]		= "cjson:no such key";
-static char exEmptyKey[]		= "cjson:empty keys not supported";
+static char exEmptyKey[]		= "cjson:use EMPTY_KEY constant";
 static char exTokenEOF[]		= "cjson:unexpected EOF";
 static char exStack[]			= "cjson:stack overflow";
 static char exStackNotEnd[]		= "cjson:not end of current object/array";
@@ -25,6 +25,8 @@ static char exTokenExpectToken[]	= "cjson:expected json token";
 static char exJSONExpectKey[]		= "cjson:key expected";
 static char exJSONExpectNonKey[]	= "cjson:non-key expected";
 static char exJSONIncomplete[]		= "cjson:incomplete json";
+
+static Array* EmptyArray;
 
 static Type* TJSON2Token;
 static Type* TToken2JSON;
@@ -44,6 +46,9 @@ void
 cjsonmodinit(void)
 {
 	builtinmod("$CJSON", CJSONmodtab, CJSONmodlen);
+
+	EmptyArray = H2D(Array*, heaparray(&Tbyte, 0));
+	poolimmutable(D2H(EmptyArray));
 
 	TJSON2Token = dtype(freeheap, CJSON_JSON2Token_size, JSON2Token_map, sizeof(JSON2Token_map));
 	TToken2JSON = dtype(freeheap, CJSON_Token2JSON_size, Token2JSON_map, sizeof(Token2JSON_map));
@@ -1103,11 +1108,15 @@ Token2JSON_key(void *fp)
 	*f->ret = H;
 	destroy(tmp);
 
-	if(!(0 <= id && id < k->len))
-		error(exNoSuchKey);
-	key = ((Array**)k->data)[id];
-	if(key == H)
-		error(exEmptyKey);
+	if(id == CJSON_EMPTY_KEY)
+		key = EmptyArray;
+	else{
+		if(!(0 <= id && id < k->len))
+			error(exNoSuchKey);
+		key = ((Array**)k->data)[id];
+		if(key == H)
+			error(exEmptyKey);
+	}
 
 	while(j->buf->len - j->size < 3 + key->len)
 		extendbuf(j);

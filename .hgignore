@@ -3,6 +3,8 @@ syntax: glob
 # debug
 *.sbl
 
+# vim
+.*.swp
 
 syntax: regexp
 

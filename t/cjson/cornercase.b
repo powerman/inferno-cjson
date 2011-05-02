@@ -65,9 +65,9 @@ test()
 	{ j.key(keys, -1); } exception e { "*" => catched(e); }
 	raised("cjson:no such key", nil);
 	{ j.key(keys, 0); } exception e { "*" => catched(e); }
-	raised("cjson:empty keys not supported", nil);
+	raised("cjson:use EMPTY_KEY constant", nil);
 	{ j.key(keys, 2); } exception e { "*" => catched(e); }
-	raised("cjson:empty keys not supported", nil);
+	raised("cjson:use EMPTY_KEY constant", nil);
 	{ j.key(keys, 3); } exception e { "*" => catched(e); }
 	raised("cjson:no such key", nil);
 
