@@ -165,13 +165,13 @@ Struct: adt{
 	arr: list of int;
 };
 
-F_STR, F_REAL, F_OPT, F_ARR: con iota;
+K_STR, K_REAL, K_OPT, K_ARR: con iota;
 
         keys := cjson->makekeys(array[] of {
-                F_STR	=> "str",
-                F_REAL	=> "real",
-                F_OPT	=> "opt",
-                F_ARR	=> "arr",
+                K_STR	=> "str",
+                K_REAL	=> "real",
+                K_OPT	=> "opt",
+                K_ARR	=> "arr",
         });
 
         struct := ref Struct;
@@ -184,11 +184,11 @@ F_STR, F_REAL, F_OPT, F_ARR: con iota;
 OBJ:	for(;;) case t.getkey(keys) {
 	END_OBJ =>	break OBJ;
 	UNK_KEY =>	t.skip();
-	F_STR =>	struct.str = t.gets();
-	F_REAL =>	struct.r = t.getr();
-	F_OPT =>	if(!t.getnull())
+	K_STR =>	struct.str = t.gets();
+	K_REAL =>	struct.r = t.getr();
+	K_OPT =>	if(!t.getnull())
 				struct.opt = t.getn();
-	F_ARR =>	t.arr();
+	K_ARR =>	t.arr();
 			while(!t.close())
 				struct.arr = t.getn() :: struct.arr;
 	}
@@ -199,10 +199,10 @@ OBJ:	for(;;) case t.getkey(keys) {
 
         json := Token2JSON.new(128)
 		.obj()
-                .key(keys, F_STR)	.str(struct.str)
-                .key(keys, F_REAL)	.realnum(struct.r)
-                .key(keys, F_OPT)	.num(struct.opt)
-                .key(keys, F_ARR)	.arr();
+                .key(keys, K_STR)	.str(struct.str)
+                .key(keys, K_REAL)	.realnum(struct.r)
+                .key(keys, K_OPT)	.num(struct.opt)
+                .key(keys, K_ARR)	.arr();
         for(l := struct.arr; l != nil; l = tl l)
                 json                    .num(hd l);
         json	                        .close()
