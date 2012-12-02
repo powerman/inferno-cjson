@@ -1,12 +1,7 @@
-syntax: glob
-
 # debug
-*.sbl
+\.sbl$
 
-# vim
-.*.swp
-
-syntax: regexp
-
-# temp
+# tmp
+\.swp$
 tmp/.*
+

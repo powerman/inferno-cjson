@@ -1,6 +1,6 @@
 .TH CJSON 2
 .SH NAME
-cjson \- fast JSON tokenizer
+makekeys, JSON2Token, Token2JSON \- fast JSON tokenizer
 .SH SYNOPSIS
 .EX
 include "cjson.m";
