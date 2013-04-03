@@ -3,7 +3,7 @@ CJSON(2)
 
 NAME
 ----
-makekeys, JSON2Token, Token2JSON - fast JSON tokenizer
+cjson: makekeys, JSON2Token, Token2JSON - fast JSON tokenizer
 
 
 SYNOPSIS
