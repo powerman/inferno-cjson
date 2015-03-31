@@ -1,24 +1,36 @@
-**CJSON** is Limbo module for OS Inferno, implemented in C for speed. It works as JSON tokenizer, allowing you to load data from JSON into your custom adt and generate JSON using data from your adt.
+# Description
 
-# Install #
+**CJSON** is a Limbo module for OS Inferno, which works as JSON tokenizer,
+allowing you to load data from JSON into your custom adt and generate JSON
+using data from your adt. It's implemented as Inferno driver in C, so
+you'll need to rebuild Inferno to install it.
+
+
+# Install
 
 Tested only on Linux.
 
-## Gentoo Linux ##
+## Gentoo Linux
 
-Add overlay "powerman" (using layman tool) and install _dev-inferno/inferno_ (with USE flag "cjson" enabled).
+Add overlay "powerman" (using layman tool) and install
+`dev-inferno/inferno` (with USE flag "cjson" enabled).
 
-## Using `hg clone` ##
+## Using `git clone`
 
 ```
 cd $INFERNO_ROOT
-hg clone https://inferno-cjson.googlecode.com/hg/ tmp/inferno-cjson
+git clone https://github.com/powerman/inferno-cjson.git tmp/inferno-cjson
 cp -a tmp/inferno-cjson/* ./
 rm -rf tmp/inferno-cjson
 ./patch.cjson
 ```
 
-# Examples #
+Then compile/install Inferno as usually.
+
+
+# Usage
+
+## Example
 
 ```
 Struct: adt{
@@ -73,3 +85,4 @@ OBJ:    for(;;) case t.getkey(keys) {
 
         text := string json.encode();
 ```
+
